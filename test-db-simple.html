@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notorix Database Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+        .title {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: left;
+        }
+        .success {
+            background: #e7f5e7;
+            border: 2px solid #4caf50;
+            color: #2e7d32;
+        }
+        .error {
+            background: #ffeaea;
+            border: 2px solid #f44336;
+            color: #c62828;
+        }
+        .loading {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            color: #1565c0;
+        }
+        .config {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 30px;
+            text-align: left;
+        }
+        .config h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .config-item:last-child {
+            border-bottom: none;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">🗄️ Notorix Database Test</h1>
+        <p class="subtitle">Test your PostgreSQL connection in real-time</p>
+        
+        <button id="testBtn" class="btn" onclick="testDatabase()">
+            🔍 Test Database Connection
+        </button>
+        
+        <button id="healthBtn" class="btn" onclick="testHealth()">
+            ❤️ Check Backend Health
+        </button>
+        
+        <div id="result"></div>
+        
+        <div class="config">
+            <h3>📋 Connection Configuration</h3>
+            <div class="config-item">
+                <strong>Host:</strong>
+                <span>localhost</span>
+            </div>
+            <div class="config-item">
+                <strong>Port:</strong>
+                <span>5432</span>
+            </div>
+            <div class="config-item">
+                <strong>Database:</strong>
+                <span>notorix</span>
+            </div>
+            <div class="config-item">
+                <strong>User:</strong>
+                <span>postgres</span>
+            </div>
+            <div class="config-item">
+                <strong>Password:</strong>
+                <span>admin</span>
+            </div>
+            <div class="config-item">
+                <strong>Backend API:</strong>
+                <span>http://localhost:5000</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function testDatabase() {
+            const btn = document.getElementById('testBtn');
+            const result = document.getElementById('result');
+            
+            // Show loading state
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Testing Connection...';
+            result.innerHTML = '<div class="result loading"><div class="spinner"></div><strong>Testing database connection...</strong><br>Please wait while we check your PostgreSQL connection.</div>';
+            
+            try {
+                const startTime = Date.now();
+                const response = await fetch('http://localhost:5000/api/test-db');
+                const data = await response.json();
+                const duration = Date.now() - startTime;
+                
+                if (data.status === 'success') {
+                    result.innerHTML = `
+                        <div class="result success">
+                            <h3>✅ Database Connection Successful!</h3>
+                            <p><strong>Message:</strong> ${data.message}</p>
+                            <p><strong>Response Time:</strong> ${data.requestTime}</p>
+                            <p><strong>Client Test Time:</strong> ${duration}ms</p>
+                            <p><strong>Connection Time:</strong> ${data.database.connectionTime}</p>
+                            <p><strong>Current Time:</strong> ${new Date(data.database.currentTime).toLocaleString()}</p>
+                            <p><strong>Pool Status:</strong> ${data.database.poolInfo.totalCount} total, ${data.database.poolInfo.idleCount} idle</p>
+                            <p><strong>PostgreSQL Version:</strong> ${data.database.postgresVersion.split(' ')[0]}</p>
+                        </div>
+                    `;
+                } else {
+                    result.innerHTML = `
+                        <div class="result error">
+                            <h3>❌ Database Connection Failed</h3>
+                            <p><strong>Message:</strong> ${data.message}</p>
+                            <p><strong>Error Code:</strong> ${data.database?.error?.code || 'Unknown'}</p>
+                            <p><strong>Error Details:</strong> ${data.database?.error?.message || 'No details available'}</p>
+                            ${data.database?.error?.hint ? `<p><strong>Hint:</strong> ${data.database.error.hint}</p>` : ''}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="result error">
+                        <h3>🌐 Network Error</h3>
+                        <p><strong>Error:</strong> Cannot connect to backend server</p>
+                        <p><strong>Details:</strong> ${error.message}</p>
+                        <p><strong>Check:</strong> Make sure the backend server is running on http://localhost:5000</p>
+                    </div>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔍 Test Database Connection';
+            }
+        }
+        
+        async function testHealth() {
+            const btn = document.getElementById('healthBtn');
+            const result = document.getElementById('result');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Checking Health...';
+            result.innerHTML = '<div class="result loading"><div class="spinner"></div><strong>Checking backend health...</strong></div>';
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/health');
+                const data = await response.json();
+                
+                result.innerHTML = `
+                    <div class="result success">
+                        <h3>❤️ Backend Health Check</h3>
+                        <p><strong>Status:</strong> ${data.status}</p>
+                        <p><strong>Uptime:</strong> ${Math.round(data.uptime)} seconds</p>
+                        <p><strong>Database:</strong> ${data.database}</p>
+                        <p><strong>Environment:</strong> ${data.environment}</p>
+                        <p><strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleString()}</p>
+                    </div>
+                `;
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="result error">
+                        <h3>💔 Backend Health Check Failed</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <p>The backend server may not be running.</p>
+                    </div>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '❤️ Check Backend Health';
+            }
+        }
+        
+        // Auto-test on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testHealth();
+            }, 1000);
+        });
+    </script>
+</body>
+</html> 

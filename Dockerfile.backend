@@ -1,0 +1,32 @@
+# Dockerfile for Notorix Backend
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY backend/package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy backend source code
+COPY backend/ ./
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S notorix -u 1001
+
+# Change ownership of the app directory
+RUN chown -R notorix:nodejs /app
+USER notorix
+
+# Expose port
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node healthcheck.js
+
+# Start the application
+CMD ["node", "server.js"] 
