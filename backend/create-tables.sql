@@ -35,21 +35,56 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='posts' AND column_name='comment_count') THEN
         ALTER TABLE posts ADD COLUMN comment_count INTEGER DEFAULT 0;
     END IF;
+    
+    -- Check and add community_id column
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='posts' AND column_name='community_id') THEN
+        ALTER TABLE posts ADD COLUMN community_id INTEGER REFERENCES communities(id) ON DELETE CASCADE;
+    END IF;
+    
+    -- Check and add sub_club_id column
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='posts' AND column_name='sub_club_id') THEN
+        ALTER TABLE posts ADD COLUMN sub_club_id INTEGER REFERENCES sub_clubs(id) ON DELETE CASCADE;
+    END IF;
 END $$;
 
--- Ensure posts table exists with all required columns
+
+-- Create communities table if it doesn't exist
+CREATE TABLE IF NOT EXISTS communities (
+  id SERIAL PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create user_communities join table if it doesn't exist
+CREATE TABLE IF NOT EXISTS user_communities (
+  user_id INTEGER NOT NULL,
+  community_id INTEGER NOT NULL,
+  joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, community_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS posts (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
     author INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    community_id INTEGER REFERENCES communities(id) ON DELETE CASCADE,
+    sub_club_id INTEGER REFERENCES sub_clubs(id) ON DELETE CASCADE,
     is_draft BOOLEAN DEFAULT FALSE,
     upvotes INTEGER DEFAULT 0,
     downvotes INTEGER DEFAULT 0,
     share_count INTEGER DEFAULT 0,
     comment_count INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Ensure a post belongs to either a community, sub-club, or neither (general post)
+    CHECK (
+        (community_id IS NOT NULL AND sub_club_id IS NULL) OR 
+        (community_id IS NULL AND sub_club_id IS NOT NULL) OR
+        (community_id IS NULL AND sub_club_id IS NULL)
+    )
 );
 
 -- Create votes table for tracking user votes on posts
@@ -98,6 +133,8 @@ CREATE TABLE IF NOT EXISTS post_shares (
 CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author);
 CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_is_draft ON posts(is_draft);
+CREATE INDEX IF NOT EXISTS idx_posts_community_id ON posts(community_id);
+CREATE INDEX IF NOT EXISTS idx_posts_sub_club_id ON posts(sub_club_id);
 CREATE INDEX IF NOT EXISTS idx_post_votes_post_id ON post_votes(post_id);
 CREATE INDEX IF NOT EXISTS idx_post_votes_user_id ON post_votes(user_id);
 CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);

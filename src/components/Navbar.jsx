@@ -1,267 +1,210 @@
-// Modern Clean Navbar Component
-import React, { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+// src/components/Navbar.jsx
+import React, { useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
 
   const handleLogout = () => {
     logout();
+    setIsProfileMenuOpen(false);
     navigate('/');
   };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchTerm.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
-    }
+  const isActivePath = (path) => {
+    return location.pathname === path;
   };
 
-  const isActiveLink = (path) => location.pathname === path;
+  const NavLink = ({ to, children, icon, external = false }) => {
+    const isActive = isActivePath(to);
+    const baseClasses = "flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 hover:bg-white/40 hover:backdrop-blur-lg";
+    const activeClasses = isActive ? "bg-white/40 backdrop-blur-lg shadow-inner text-iosBlue" : "text-iosGray-700 hover:text-iosGray-900";
+    
+    if (external) {
+      return (
+        <a href={to} className={`${baseClasses} ${activeClasses}`}>
+          {icon && <span className="text-lg">{icon}</span>}
+          <span>{children}</span>
+        </a>
+      );
+    }
+
+    return (
+      <Link to={to} className={`${baseClasses} ${activeClasses}`}>
+        {icon && <span className="text-lg">{icon}</span>}
+        <span>{children}</span>
+      </Link>
+    );
+  };
+
+  const ProfileDropdown = () => (
+    <div className={`absolute right-0 top-full mt-2 w-64 bg-white/90 backdrop-blur-xl rounded-2xl shadow-ios-lg border border-white/20 overflow-hidden transition-all duration-200 ${isProfileMenuOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-2'}`}>
+      {/* User Info */}
+      <div className="p-4 border-b border-iosGray-200/30">
+        <div className="flex items-center space-x-3">
+          <div className="w-12 h-12 bg-gradient-to-br from-iosBlue to-iosPurple rounded-full flex items-center justify-center text-white font-semibold text-lg">
+            {user?.username?.charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-iosGray-900 truncate">
+              {user?.username}
+            </p>
+            <p className="text-xs text-iosGray-500 truncate">
+              {user?.email}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Menu Items */}
+      <div className="p-2">
+        <Link
+          to={`/user/${user?.id}`}
+          className="flex items-center space-x-3 px-3 py-2 rounded-xl hover:bg-iosGray-100/50 transition-colors duration-150"
+          onClick={() => setIsProfileMenuOpen(false)}
+        >
+          <span className="text-iosGray-600">👤</span>
+          <span className="text-sm font-medium text-iosGray-700">Profile</span>
+        </Link>
+        
+        <Link
+          to="/create-community"
+          className="flex items-center space-x-3 px-3 py-2 rounded-xl hover:bg-iosGray-100/50 transition-colors duration-150"
+          onClick={() => setIsProfileMenuOpen(false)}
+        >
+          <span className="text-iosGray-600">🏘️</span>
+          <span className="text-sm font-medium text-iosGray-700">Create Community</span>
+        </Link>
+
+        <Link
+          to="/create-subclub"
+          className="flex items-center space-x-3 px-3 py-2 rounded-xl hover:bg-iosGray-100/50 transition-colors duration-150"
+          onClick={() => setIsProfileMenuOpen(false)}
+        >
+          <span className="text-iosGray-600">🎯</span>
+          <span className="text-sm font-medium text-iosGray-700">Create Sub-Club</span>
+        </Link>
+
+        <div className="border-t border-iosGray-200/30 my-2"></div>
+        
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center space-x-3 px-3 py-2 rounded-xl hover:bg-iosRed/10 transition-colors duration-150 text-left"
+        >
+          <span className="text-iosRed">🚪</span>
+          <span className="text-sm font-medium text-iosRed">Sign Out</span>
+        </button>
+      </div>
+    </div>
+  );
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-b border-gray-100 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          
-          {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-lg">N</span>
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              Natarix
-            </span>
-          </Link>
-
-          {/* Search Bar - Desktop */}
-          <div className="hidden md:flex flex-1 max-w-lg mx-8">
-            <form onSubmit={handleSearch} className="w-full">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search posts, communities..."
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                />
+    <>
+      {/* Fixed navbar */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-md border-b border-white/20 shadow-glass-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <Link to="/" className="flex items-center space-x-3 group">
+              <div className="w-10 h-10 bg-gradient-to-br from-iosBlue to-iosPurple rounded-2xl flex items-center justify-center transform group-hover:scale-105 transition-transform duration-200">
+                <span className="text-white font-bold text-lg">N</span>
               </div>
-            </form>
-          </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-iosBlue to-iosPurple bg-clip-text text-transparent">
+                Natarix
+              </span>
+            </Link>
 
-          {/* Navigation Links & User Menu */}
-          <div className="flex items-center space-x-4">
-            
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-1">
-              <Link
-                to="/"
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                  isActiveLink('/') 
-                    ? 'bg-purple-100 text-purple-700' 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-              >
-                Home
-              </Link>
-              
-              <Link
-                to="/community"
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                  isActiveLink('/community') 
-                    ? 'bg-purple-100 text-purple-700' 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-              >
-                Communities
-              </Link>
-
+            <div className="hidden md:flex items-center space-x-2">
+              <NavLink to="/" icon="🏠">Home</NavLink>
+              <NavLink to="/communities" icon="🏘️">Communities</NavLink>
               {isAuthenticated && (
-                <Link
-                  to="/create-post"
-                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg text-sm font-medium hover:from-purple-700 hover:to-blue-700 transition-all duration-200"
-                >
-                  Create Post
-                </Link>
+                <NavLink to="/create-post" icon="✍️">Create Post</NavLink>
               )}
             </div>
 
-            {/* User Section */}
-            {isAuthenticated ? (
-              <div className="flex items-center space-x-3">
-                {/* User Avatar & Menu */}
+            {/* Right side */}
+            <div className="flex items-center space-x-4">
+              {isAuthenticated ? (
                 <div className="relative">
                   <button
-                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                    className="flex items-center space-x-2 p-1 rounded-full hover:bg-gray-100 transition-colors duration-200"
+                    onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                    className="flex items-center space-x-2 p-2 rounded-xl hover:bg-white/40 transition-all duration-200"
                   >
-                    <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-blue-400 rounded-full flex items-center justify-center">
-                      <span className="text-white font-medium text-sm">
-                        {user?.username?.[0]?.toUpperCase() || 'U'}
-                      </span>
+                    <div className="w-8 h-8 bg-gradient-to-br from-iosBlue to-iosPurple rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                      {user?.username?.charAt(0).toUpperCase()}
                     </div>
-                    <span className="hidden md:block text-sm font-medium text-gray-700">{user?.username}</span>
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg 
+                      className={`w-4 h-4 text-iosGray-600 transition-transform duration-200 ${isProfileMenuOpen ? 'rotate-180' : ''}`} 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
-
-                  {/* Dropdown Menu */}
-                  {isMobileMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
-                      <Link
-                        to={`/user/${user?.id}`}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        Profile
-                      </Link>
-                      <Link
-                        to="/settings"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        Settings
-                      </Link>
-                      <hr className="my-1" />
-                      <button
-                        onClick={handleLogout}
-                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                      >
-                        Sign Out
-                      </button>
-                    </div>
-                  )}
+                  <ProfileDropdown />
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-3">
-                <Link
-                  to="/login"
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors duration-200"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  to="/register"
-                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg text-sm font-medium hover:from-purple-700 hover:to-blue-700 transition-all duration-200"
-                >
-                  Sign Up
-                </Link>
-              </div>
-            )}
-
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors duration-200"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-100 py-4">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {/* Mobile Search */}
-              <form onSubmit={handleSearch} className="mb-4">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search..."
-                    className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-              </form>
-
-              {/* Mobile Navigation Links */}
-              <Link
-                to="/"
-                className={`block px-3 py-2 rounded-lg text-base font-medium ${
-                  isActiveLink('/') ? 'bg-purple-100 text-purple-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Home
-              </Link>
-              <Link
-                to="/community"
-                className={`block px-3 py-2 rounded-lg text-base font-medium ${
-                  isActiveLink('/community') ? 'bg-purple-100 text-purple-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Communities
-              </Link>
-
-              {isAuthenticated ? (
-                <>
-                  <Link
-                    to="/create-post"
-                    className="block px-3 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg text-base font-medium text-center"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Create Post
-                  </Link>
-                  <Link
-                    to={`/user/${user?.id}`}
-                    className="block px-3 py-2 rounded-lg text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Profile
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="block w-full text-left px-3 py-2 rounded-lg text-base font-medium text-red-600 hover:bg-red-50"
-                  >
-                    Sign Out
-                  </button>
-                </>
               ) : (
-                <>
+                <div className="flex items-center space-x-3">
                   <Link
                     to="/login"
-                    className="block px-3 py-2 rounded-lg text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="px-4 py-2 text-sm font-medium text-iosGray-700 hover:text-iosBlue transition-colors duration-200"
                   >
                     Sign In
                   </Link>
                   <Link
                     to="/register"
-                    className="block px-3 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg text-base font-medium text-center"
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="px-4 py-2 bg-iosBlue text-white text-sm font-medium rounded-xl hover:bg-iosBlue/90 transition-all duration-200 shadow-ios"
                   >
                     Sign Up
                   </Link>
-                </>
+                </div>
+              )}
+
+              {/* Mobile menu button */}
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="md:hidden p-2 rounded-xl hover:bg-white/40 transition-colors duration-200"
+              >
+                <svg className="w-6 h-6 text-iosGray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Mobile menu overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>
+          <div className="fixed top-16 left-0 right-0 bg-white/95 backdrop-blur-xl border-b border-white/20 shadow-ios-lg animate-slide-up">
+            <div className="px-4 py-6 space-y-2">
+              <NavLink to="/" icon="🏠">Home</NavLink>
+              <NavLink to="/communities" icon="🏘️">Communities</NavLink>
+              {isAuthenticated && (
+                <NavLink to="/create-post" icon="✍️">Create Post</NavLink>
               )}
             </div>
           </div>
-        )}
-      </div>
-    </nav>
+        </div>
+      )}
+
+      {/* Backdrop overlay for profile dropdown */}
+      {isProfileMenuOpen && (
+        <div 
+          className="fixed inset-0 z-30" 
+          onClick={() => setIsProfileMenuOpen(false)}
+        ></div>
+      )}
+    </>
   );
 };
 

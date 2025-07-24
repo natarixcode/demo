@@ -1,19 +1,22 @@
 // backend/server.js - Main Express Server
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 require('dotenv').config({ path: './config.env' });
 
 // Import database connection
 const { pool } = require('./db');
 
+
 // Import routes
 const testDbRoute = require('./routes/test-db.route');
+const communityRoute = require('./routes/community.route');
 
 const app = express();
 
 // Enhanced CORS configuration
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:4173'],
+  origin: ['http://localhost', 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:4173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -51,8 +54,10 @@ const requireDB = (req, res, next) => {
 // API ROUTES (with /api prefix)
 // ================================
 
+
 // Mount test-db routes
 app.use('/api', testDbRoute);
+app.use('/api', communityRoute);
 
 // Basic route with API documentation
 app.get('/', (req, res) => {
@@ -200,7 +205,7 @@ app.delete('/api/users/:id', requireDB, async (req, res) => {
 // POST ROUTES (Enhanced with Voting, Comments, Shares, Drafts)
 // ================================
 
-// Get all posts with enhanced data
+// Get all posts with enhanced data (includes community and subclub info)
 app.get('/api/posts', requireDB, async (req, res) => {
   try {
     const { drafts = 'false' } = req.query;
@@ -209,9 +214,13 @@ app.get('/api/posts', requireDB, async (req, res) => {
     const result = await pool.query(`
       SELECT p.id, p.title, p.content, p.created_at, p.updated_at, p.is_draft,
              p.upvotes, p.downvotes, p.share_count, p.comment_count,
-             u.username as author_name, u.id as author_id
+             p.community_id, p.sub_club_id,
+             u.username as author_name, u.id as author_id,
+             c.name as community_name, sc.name as sub_club_name
       FROM posts p
       JOIN users u ON p.author = u.id
+      LEFT JOIN communities c ON p.community_id = c.id
+      LEFT JOIN sub_clubs sc ON p.sub_club_id = sc.id
       WHERE p.is_draft = $1 OR $2 = true
       ORDER BY p.created_at DESC
     `, [false, includeDrafts]);
@@ -227,16 +236,20 @@ app.get('/api/posts', requireDB, async (req, res) => {
   }
 });
 
-// Get post by ID with enhanced data
+// Get post by ID with enhanced data (includes community and subclub info)
 app.get('/api/posts/:id', requireDB, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(`
       SELECT p.id, p.title, p.content, p.created_at, p.updated_at, p.is_draft,
              p.upvotes, p.downvotes, p.share_count, p.comment_count,
-             u.username as author_name, u.id as author_id
+             p.community_id, p.sub_club_id,
+             u.username as author_name, u.id as author_id,
+             c.name as community_name, sc.name as sub_club_name
       FROM posts p
       JOIN users u ON p.author = u.id
+      LEFT JOIN communities c ON p.community_id = c.id
+      LEFT JOIN sub_clubs sc ON p.sub_club_id = sc.id
       WHERE p.id = $1
     `, [id]);
     
@@ -254,7 +267,7 @@ app.get('/api/posts/:id', requireDB, async (req, res) => {
   }
 });
 
-// Get posts by user ID with enhanced data
+// Get posts by user ID with enhanced data (includes community and subclub info)
 app.get('/api/users/:id/posts', requireDB, async (req, res) => {
   try {
     const { id } = req.params;
@@ -263,8 +276,12 @@ app.get('/api/users/:id/posts', requireDB, async (req, res) => {
     
     const result = await pool.query(`
       SELECT p.id, p.title, p.content, p.created_at, p.updated_at, p.is_draft,
-             p.upvotes, p.downvotes, p.share_count, p.comment_count
+             p.upvotes, p.downvotes, p.share_count, p.comment_count,
+             p.community_id, p.sub_club_id,
+             c.name as community_name, sc.name as sub_club_name
       FROM posts p
+      LEFT JOIN communities c ON p.community_id = c.id
+      LEFT JOIN sub_clubs sc ON p.sub_club_id = sc.id
       WHERE p.author = $1 AND (p.is_draft = false OR $2 = true)
       ORDER BY p.created_at DESC
     `, [id, includeDrafts]);
@@ -280,18 +297,47 @@ app.get('/api/users/:id/posts', requireDB, async (req, res) => {
   }
 });
 
-// Create new post with draft support
+// Create new post with draft support (supports community and subclub posts)
 app.post('/api/posts', requireDB, async (req, res) => {
   try {
-    const { title, content, author, is_draft = false } = req.body;
+    const { title, content, author, community_id, sub_club_id, is_draft = false } = req.body;
     
     if (!title || !content || !author) {
       return res.status(400).json({ error: 'Title, content, and author are required' });
     }
     
+    // Validate that post doesn't belong to both community and subclub
+    if (community_id && sub_club_id) {
+      return res.status(400).json({ error: 'Post cannot belong to both community and sub-club' });
+    }
+    
+    // If posting to a community, verify user is a member
+    if (community_id) {
+      const membershipCheck = await pool.query(
+        'SELECT role FROM community_memberships WHERE community_id = $1 AND user_id = $2 AND status = $3',
+        [community_id, author, 'active']
+      );
+      
+      if (membershipCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'You must be a member of the community to post' });
+      }
+    }
+    
+    // If posting to a subclub, verify user is a member
+    if (sub_club_id) {
+      const membershipCheck = await pool.query(
+        'SELECT role FROM community_memberships WHERE sub_club_id = $1 AND user_id = $2 AND status = $3',
+        [sub_club_id, author, 'active']
+      );
+      
+      if (membershipCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'You must be a member of the sub-club to post' });
+      }
+    }
+    
     const result = await pool.query(
-      'INSERT INTO posts (title, content, author, is_draft) VALUES ($1, $2, $3, $4) RETURNING *',
-      [title, content, author, is_draft]
+      'INSERT INTO posts (title, content, author, community_id, sub_club_id, is_draft) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [title, content, author, community_id, sub_club_id, is_draft]
     );
     
     res.status(201).json({
@@ -732,6 +778,17 @@ app.post('/api/auth/login', requireDB, async (req, res) => {
     
     const user = result.rows[0];
     
+    // Generate proper JWT token
+    const token = jwt.sign(
+      { 
+        userId: user.id,
+        username: user.username,
+        email: user.email
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
+    );
+    
     res.json({
       success: true,
       message: 'Login successful',
@@ -741,7 +798,7 @@ app.post('/api/auth/login', requireDB, async (req, res) => {
         email: user.email,
         created_at: user.created_at
       },
-      token: `mock-token-${user.id}-${Date.now()}` // Mock JWT token
+      token: token
     });
   } catch (err) {
     console.error('Error during login:', err);
@@ -817,6 +874,17 @@ app.post('/api/auth/register', requireDB, async (req, res) => {
     
     const user = result.rows[0];
     
+    // Generate proper JWT token
+    const token = jwt.sign(
+      { 
+        userId: user.id,
+        username: user.username,
+        email: user.email
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
+    );
+    
     res.status(201).json({
       success: true,
       message: 'Registration successful',
@@ -826,7 +894,7 @@ app.post('/api/auth/register', requireDB, async (req, res) => {
         email: user.email,
         created_at: user.created_at
       },
-      token: `mock-token-${user.id}-${Date.now()}` // Mock JWT token
+      token: token
     });
   } catch (err) {
     console.error('Error during registration:', err);

@@ -1,194 +1,255 @@
+// src/components/LoadingSpinner.jsx
 import React from 'react';
 
 /**
- * Loading Spinner Component
- * A reusable loading indicator with different variants and sizes
- * 
- * @param {string} variant - The spinner variant ('default', 'dots', 'pulse', 'bars')
- * @param {string} size - The spinner size ('sm', 'md', 'lg', 'xl')
- * @param {string} color - The spinner color (Tailwind color classes)
- * @param {string} className - Additional CSS classes
- * @param {string} text - Optional loading text to display
+ * Beautiful iOS 17-inspired Loading Spinner Component
+ * Features:
+ * - Multiple size variants (sm, md, lg, xl)
+ * - Smooth iOS-style animations
+ * - Glassmorphism background for overlay mode
+ * - Optional text with elegant typography
+ * - Customizable colors to match different contexts
  */
 const LoadingSpinner = ({ 
-  variant = 'default', 
   size = 'md', 
-  color = 'text-blue-600', 
-  className = '', 
-  text = null 
+  text = '', 
+  overlay = false, 
+  color = 'blue',
+  className = '',
+  textClassName = ''
 }) => {
-  // Size classes mapping
-  const sizeClasses = {
-    sm: 'w-4 h-4',
-    md: 'w-6 h-6',
-    lg: 'w-8 h-8',
-    xl: 'w-12 h-12'
+  // Size configurations
+  const sizeConfig = {
+    sm: {
+      spinner: 'w-4 h-4',
+      text: 'text-xs',
+      container: 'space-y-2'
+    },
+    md: {
+      spinner: 'w-6 h-6',
+      text: 'text-sm',
+      container: 'space-y-3'
+    },
+    lg: {
+      spinner: 'w-8 h-8',
+      text: 'text-base',
+      container: 'space-y-4'
+    },
+    xl: {
+      spinner: 'w-12 h-12',
+      text: 'text-lg',
+      container: 'space-y-4'
+    }
   };
 
-  // Default spinner (circular)
-  const DefaultSpinner = () => (
-    <svg 
-      className={`animate-spin ${sizeClasses[size]} ${color} ${className}`}
-      xmlns="http://www.w3.org/2000/svg" 
-      fill="none" 
-      viewBox="0 0 24 24"
-    >
-      <circle 
-        className="opacity-25" 
-        cx="12" 
-        cy="12" 
-        r="10" 
-        stroke="currentColor" 
-        strokeWidth="4"
-      />
-      <path 
-        className="opacity-75" 
-        fill="currentColor" 
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      />
-    </svg>
-  );
+  // Color configurations
+  const colorConfig = {
+    blue: {
+      spinner: 'border-iosBlue',
+      text: 'text-iosBlue',
+      glow: 'drop-shadow-[0_0_8px_rgba(0,122,255,0.3)]'
+    },
+    gray: {
+      spinner: 'border-iosGray-600',
+      text: 'text-iosGray-600',
+      glow: 'drop-shadow-[0_0_8px_rgba(107,114,128,0.3)]'
+    },
+    green: {
+      spinner: 'border-iosGreen',
+      text: 'text-iosGreen',
+      glow: 'drop-shadow-[0_0_8px_rgba(52,199,89,0.3)]'
+    },
+    purple: {
+      spinner: 'border-iosPurple',
+      text: 'text-iosPurple',
+      glow: 'drop-shadow-[0_0_8px_rgba(175,82,222,0.3)]'
+    },
+    orange: {
+      spinner: 'border-iosOrange',
+      text: 'text-iosOrange',
+      glow: 'drop-shadow-[0_0_8px_rgba(255,149,0,0.3)]'
+    }
+  };
 
-  // Dots spinner
-  const DotsSpinner = () => (
-    <div className={`flex space-x-1 ${className}`}>
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className={`${sizeClasses[size].split(' ')[0]} ${sizeClasses[size].split(' ')[1]} ${color} rounded-full animate-pulse`}
-          style={{ animationDelay: `${i * 0.2}s` }}
-        />
-      ))}
+  const sizeClasses = sizeConfig[size] || sizeConfig.md;
+  const colorClasses = colorConfig[color] || colorConfig.blue;
+
+  // Spinner component
+  const SpinnerElement = () => (
+    <div className="relative">
+      {/* Main spinner */}
+      <div 
+        className={`
+          ${sizeClasses.spinner} 
+          ${colorClasses.spinner} 
+          ${colorClasses.glow}
+          border-2 border-current border-t-transparent 
+          rounded-full animate-spin
+          ${className}
+        `}
+      ></div>
+      
+      {/* Inner glow effect */}
+      <div 
+        className={`
+          absolute inset-0
+          ${sizeClasses.spinner} 
+          ${colorClasses.spinner}
+          border border-current border-t-transparent 
+          rounded-full animate-spin opacity-50
+        `}
+        style={{
+          animationDuration: '1.5s',
+          animationDirection: 'reverse'
+        }}
+      ></div>
     </div>
   );
 
-  // Pulse spinner
-  const PulseSpinner = () => (
-    <div className={`${sizeClasses[size]} ${color} ${className} animate-pulse rounded-full bg-current`} />
-  );
+  // Content wrapper
+  const ContentWrapper = ({ children }) => {
+    if (overlay) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          <div className="bg-white/90 backdrop-blur-xl rounded-2xl border border-white/30 shadow-ios-lg p-8 max-w-sm mx-4">
+            {children}
+          </div>
+        </div>
+      );
+    }
 
-  // Bars spinner
-  const BarsSpinner = () => (
-    <div className={`flex space-x-1 ${className}`}>
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className={`w-1 ${sizeClasses[size].split(' ')[1]} ${color} bg-current animate-pulse`}
-          style={{ animationDelay: `${i * 0.1}s` }}
-        />
-      ))}
-    </div>
-  );
-
-  // Spinner component mapping
-  const spinnerComponents = {
-    default: DefaultSpinner,
-    dots: DotsSpinner,
-    pulse: PulseSpinner,
-    bars: BarsSpinner
+    return (
+      <div className={`flex flex-col items-center justify-center ${sizeClasses.container}`}>
+        {children}
+      </div>
+    );
   };
-
-  const SpinnerComponent = spinnerComponents[variant] || DefaultSpinner;
 
   return (
-    <div className="flex flex-col items-center justify-center">
-      <SpinnerComponent />
+    <ContentWrapper>
+      <SpinnerElement />
+      
       {text && (
-        <p className="mt-2 text-sm text-gray-600 animate-pulse">
+        <div className={`
+          ${sizeClasses.text} 
+          ${colorClasses.text} 
+          font-medium text-center
+          animate-pulse
+          ${textClassName}
+        `}>
           {text}
-        </p>
+        </div>
       )}
-    </div>
+    </ContentWrapper>
   );
 };
 
-/**
- * Skeleton Loading Component
- * Shows placeholder content while data is loading
- */
+// Predefined spinner variants for common use cases
+export const LoadingOverlay = ({ text = 'Loading...' }) => (
+  <LoadingSpinner 
+    size="lg" 
+    text={text} 
+    overlay={true} 
+    color="blue"
+  />
+);
+
+export const SmallSpinner = ({ color = 'gray' }) => (
+  <LoadingSpinner 
+    size="sm" 
+    color={color}
+    className="inline-block"
+  />
+);
+
+export const ButtonSpinner = ({ color = 'gray' }) => (
+  <LoadingSpinner 
+    size="sm" 
+    color={color}
+    className="inline-block mr-2"
+  />
+);
+
+export const PageLoader = ({ text = 'Loading page...' }) => (
+  <div className="min-h-[400px] flex items-center justify-center">
+    <LoadingSpinner 
+      size="xl" 
+      text={text} 
+      color="blue"
+    />
+  </div>
+);
+
+export const InlineLoader = ({ text = 'Loading...', size = 'md', color = 'blue' }) => (
+  <div className="flex items-center justify-center space-x-3 py-8">
+    <LoadingSpinner 
+      size={size} 
+      color={color}
+      className="flex-shrink-0"
+    />
+    {text && (
+      <span className={`
+        ${size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-lg' : 'text-base'}
+        font-medium 
+        ${colorConfig[color]?.text || 'text-iosBlue'}
+      `}>
+        {text}
+      </span>
+    )}
+  </div>
+);
+
+// iOS-style skeleton loader for content
 export const SkeletonLoader = ({ 
   lines = 3, 
-  className = '', 
-  height = 'h-4' 
-}) => {
-  return (
-    <div className={`animate-pulse ${className}`}>
-      {Array.from({ length: lines }).map((_, index) => (
-        <div
-          key={index}
-          className={`${height} bg-gray-200 rounded mb-2 ${
-            index === lines - 1 ? 'w-3/4' : 'w-full'
-          }`}
-        />
-      ))}
-    </div>
-  );
-};
-
-/**
- * Card Skeleton Component
- * Shows a skeleton for card-like content
- */
-export const CardSkeleton = ({ className = '' }) => {
-  return (
-    <div className={`bg-white rounded-lg shadow p-6 ${className}`}>
-      <div className="animate-pulse">
-        {/* Title skeleton */}
-        <div className="h-6 bg-gray-200 rounded w-3/4 mb-4" />
-        
-        {/* Content skeleton */}
-        <div className="space-y-3">
-          <div className="h-4 bg-gray-200 rounded w-full" />
-          <div className="h-4 bg-gray-200 rounded w-5/6" />
-          <div className="h-4 bg-gray-200 rounded w-4/6" />
-        </div>
-        
-        {/* Footer skeleton */}
-        <div className="flex justify-between items-center mt-4">
-          <div className="h-4 bg-gray-200 rounded w-1/4" />
-          <div className="h-8 bg-gray-200 rounded w-20" />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/**
- * Table Skeleton Component
- * Shows a skeleton for table content
- */
-export const TableSkeleton = ({ rows = 5, columns = 4, className = '' }) => {
-  return (
-    <div className={`bg-white rounded-lg shadow overflow-hidden ${className}`}>
-      <div className="animate-pulse">
-        {/* Header */}
-        <div className="bg-gray-50 px-6 py-3 border-b">
-          <div className="flex space-x-4">
-            {Array.from({ length: columns }).map((_, index) => (
-              <div
-                key={index}
-                className="h-4 bg-gray-200 rounded flex-1"
-              />
-            ))}
-          </div>
-        </div>
-        
-        {/* Rows */}
-        {Array.from({ length: rows }).map((_, rowIndex) => (
-          <div key={rowIndex} className="px-6 py-4 border-b">
-            <div className="flex space-x-4">
-              {Array.from({ length: columns }).map((_, colIndex) => (
-                <div
-                  key={colIndex}
-                  className="h-4 bg-gray-200 rounded flex-1"
-                />
-              ))}
-            </div>
-          </div>
+  avatar = false, 
+  title = false,
+  className = '' 
+}) => (
+  <div className={`animate-pulse ${className}`}>
+    <div className="flex items-start space-x-3">
+      {avatar && (
+        <div className="w-10 h-10 bg-iosGray-200 rounded-full"></div>
+      )}
+      <div className="flex-1 space-y-3">
+        {title && (
+          <div className="h-4 bg-iosGray-200 rounded-xl w-1/3"></div>
+        )}
+        {Array.from({ length: lines }).map((_, index) => (
+          <div 
+            key={index}
+            className={`h-3 bg-iosGray-200 rounded-xl ${
+              index === lines - 1 ? 'w-2/3' : 'w-full'
+            }`}
+          ></div>
         ))}
       </div>
     </div>
-  );
-};
+  </div>
+);
+
+// Card skeleton for community/post cards
+export const CardSkeleton = ({ className = '' }) => (
+  <div className={`bg-white/70 backdrop-blur-md rounded-2xl border border-white/20 p-6 animate-pulse ${className}`}>
+    <div className="flex items-start justify-between mb-4">
+      <div className="flex-1">
+        <div className="h-5 bg-iosGray-200 rounded-xl w-2/3 mb-2"></div>
+        <div className="h-3 bg-iosGray-200 rounded-xl w-full mb-1"></div>
+        <div className="h-3 bg-iosGray-200 rounded-xl w-4/5"></div>
+      </div>
+      <div className="w-8 h-8 bg-iosGray-200 rounded-full"></div>
+    </div>
+    
+    <div className="flex items-center space-x-4 mb-4">
+      <div className="h-6 bg-iosGray-200 rounded-full w-20"></div>
+      <div className="h-6 bg-iosGray-200 rounded-full w-16"></div>
+    </div>
+    
+    <div className="flex items-center justify-between">
+      <div className="h-8 bg-iosGray-200 rounded-xl w-20"></div>
+      <div className="h-8 bg-iosGray-200 rounded-xl w-16"></div>
+    </div>
+  </div>
+);
 
 export default LoadingSpinner; 

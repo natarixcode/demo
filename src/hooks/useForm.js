@@ -166,12 +166,12 @@ export const useForm = (initialValues = {}, validationSchema = {}, onSubmit = nu
     return {
       // DOM props (safe to spread on input elements)
       name,
-      value: values[name] || '',
+    value: values[name] || '',
       onChange: (e) => {
         const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
         handleChange(name, value);
       },
-      onBlur: () => handleBlur(name),
+    onBlur: () => handleBlur(name),
       
       // Custom props (should be destructured separately, not spread on DOM elements)
       error: fieldError,

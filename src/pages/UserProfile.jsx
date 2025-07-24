@@ -18,10 +18,12 @@ import { toast } from 'react-toastify';
 const UserProfile = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, getAuthHeader } = useAuth();
   const [activeTab, setActiveTab] = useState('posts');
   const [userProfile, setUserProfile] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
+  const [userCommunities, setUserCommunities] = useState([]);
+  const [userSubClubs, setUserSubClubs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -37,7 +39,7 @@ const UserProfile = () => {
         setLoading(true);
         
         // Fetch user info
-        const userResponse = await fetch(`http://localhost:5000/api/users/${userId}`);
+        const userResponse = await fetch(`http://localhost:3001/api/users/${userId}`);
         if (!userResponse.ok) {
           throw new Error('User not found');
         }
@@ -45,10 +47,40 @@ const UserProfile = () => {
         setUserProfile(userData.data);
 
         // Fetch user's posts
-        const postsResponse = await fetch(`http://localhost:5000/api/users/${userId}/posts`);
+        const postsResponse = await fetch(`http://localhost:3001/api/users/${userId}/posts`);
         if (postsResponse.ok) {
           const postsData = await postsResponse.json();
           setUserPosts(postsData.data || []);
+        }
+
+        // Fetch user's communities (only if viewing own profile or if authenticated)
+        if (isAuthenticated && (user?.id === parseInt(userId) || user?.id === userId)) {
+          try {
+            const communitiesResponse = await fetch(`http://localhost:3001/api/communities/my`, {
+              headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeader()
+              }
+            });
+            if (communitiesResponse.ok) {
+              const communitiesData = await communitiesResponse.json();
+              setUserCommunities(communitiesData.data || communitiesData.communities || []);
+            }
+
+            // Fetch user's sub-clubs
+            const subClubsResponse = await fetch(`http://localhost:3001/api/sub-clubs/my`, {
+              headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeader()
+              }
+            });
+            if (subClubsResponse.ok) {
+              const subClubsData = await subClubsResponse.json();
+              setUserSubClubs(subClubsData.data || subClubsData.subClubs || []);
+            }
+          } catch (err) {
+            console.error('Error fetching user communities:', err);
+          }
         }
 
       } catch (err) {
@@ -82,7 +114,7 @@ const UserProfile = () => {
 
   const handlePublishDraft = async (draftId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/posts/${draftId}/publish`, {
+      const response = await fetch(`http://localhost:3001/api/posts/${draftId}/publish`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -107,7 +139,7 @@ const UserProfile = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/posts/${draftId}`, {
+      const response = await fetch(`http://localhost:3001/api/posts/${draftId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -205,7 +237,7 @@ const UserProfile = () => {
               </p>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-6">
+              <div className={`grid gap-4 ${isOwnProfile ? 'grid-cols-5' : 'grid-cols-3'}`}>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-gray-900">{totalPosts}</div>
                   <div className="text-sm text-gray-600">Posts</div>
@@ -218,6 +250,18 @@ const UserProfile = () => {
                   <div className="text-2xl font-bold text-gray-900">{totalComments}</div>
                   <div className="text-sm text-gray-600">Comments</div>
                 </div>
+                {isOwnProfile && (
+                  <>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-gray-900">{userCommunities.length}</div>
+                      <div className="text-sm text-gray-600">Communities</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-gray-900">{userSubClubs.length}</div>
+                      <div className="text-sm text-gray-600">Sub-Clubs</div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -273,6 +317,32 @@ const UserProfile = () => {
                 }`}
               >
                 📄 Drafts ({drafts.length})
+              </button>
+            )}
+
+            {isOwnProfile && (
+              <button
+                onClick={() => setActiveTab('communities')}
+                className={`pb-2 font-medium transition-colors duration-200 ${
+                  activeTab === 'communities'
+                    ? 'text-purple-600 border-b-2 border-purple-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🏘️ Communities ({userCommunities.length})
+              </button>
+            )}
+
+            {isOwnProfile && (
+              <button
+                onClick={() => setActiveTab('subclubs')}
+                className={`pb-2 font-medium transition-colors duration-200 ${
+                  activeTab === 'subclubs'
+                    ? 'text-purple-600 border-b-2 border-purple-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🎯 Sub-Clubs ({userSubClubs.length})
               </button>
             )}
             
@@ -427,6 +497,230 @@ const UserProfile = () => {
                   >
                     Create a draft
                   </Link>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'communities' && (
+            <div className="space-y-4">
+              {userCommunities.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {userCommunities.map((community, index) => (
+                    <div
+                      key={community.id}
+                      className="glass-card rounded-xl p-6 animate-slide-up hover:shadow-lg transition-shadow"
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <Link 
+                            to={`/communities/${community.id}`}
+                            className="text-xl font-semibold text-gray-900 hover:text-purple-600 transition-colors"
+                          >
+                            {community.name}
+                          </Link>
+                          
+                          <div className="flex items-center space-x-2 mt-2">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              community.role === 'creator' ? 'bg-purple-100 text-purple-800' :
+                              community.role === 'moderator' ? 'bg-blue-100 text-blue-800' :
+                              'bg-green-100 text-green-800'
+                            }`}>
+                              {community.role === 'creator' ? '👑 Creator' :
+                               community.role === 'moderator' ? '🛡️ Moderator' :
+                               '👤 Member'}
+                            </span>
+                            
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              community.type === 'location_bound' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {community.type === 'location_bound' ? '📍 Location-bound' : '🌐 Global'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {community.description && (
+                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                          {community.description}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
+                        <span>👥 {community.actual_member_count || community.member_count || 0} members</span>
+                        {community.location && (
+                          <span>📍 {community.location}</span>
+                        )}
+                      </div>
+
+                      {community.tags && community.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {community.tags.slice(0, 3).map((tag, tagIndex) => (
+                            <span 
+                              key={tagIndex}
+                              className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                          {community.tags.length > 3 && (
+                            <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                              +{community.tags.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400">
+                          Joined {formatTimeAgo(community.joined_at || community.user_joined_at)}
+                        </span>
+                        
+                        <Link
+                          to={`/communities/${community.id}`}
+                          className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+                        >
+                          View →
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="glass-card rounded-xl p-8 text-center">
+                  <div className="mb-4">
+                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">No communities joined yet</h4>
+                  <p className="text-gray-600 mb-4">Start by exploring and joining communities that interest you!</p>
+                  <Link
+                    to="/communities"
+                    className="btn-primary px-6 py-2"
+                  >
+                    Browse Communities
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'subclubs' && (
+            <div className="space-y-4">
+              {userSubClubs.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {userSubClubs.map((subClub, index) => (
+                    <div
+                      key={subClub.id}
+                      className="glass-card rounded-xl p-6 animate-slide-up hover:shadow-lg transition-shadow"
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <Link 
+                            to={`/sub-clubs/${subClub.id}`}
+                            className="text-xl font-semibold text-gray-900 hover:text-purple-600 transition-colors"
+                          >
+                            {subClub.name}
+                          </Link>
+                          
+                          <div className="flex items-center space-x-2 mt-2">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              subClub.role === 'creator' ? 'bg-purple-100 text-purple-800' :
+                              subClub.role === 'moderator' ? 'bg-blue-100 text-blue-800' :
+                              'bg-green-100 text-green-800'
+                            }`}>
+                              {subClub.role === 'creator' ? '👑 Creator' :
+                               subClub.role === 'moderator' ? '🛡️ Moderator' :
+                               '👤 Member'}
+                            </span>
+                            
+                            {subClub.is_independent ? (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                                🆓 Independent
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                🏘️ In Community
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {subClub.description && (
+                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                          {subClub.description}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
+                        <span>👥 {subClub.actual_member_count || subClub.member_count || 0} members</span>
+                        {subClub.community_name && (
+                          <span>🏘️ {subClub.community_name}</span>
+                        )}
+                      </div>
+
+                      {subClub.tags && subClub.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {subClub.tags.slice(0, 3).map((tag, tagIndex) => (
+                            <span 
+                              key={tagIndex}
+                              className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                          {subClub.tags.length > 3 && (
+                            <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                              +{subClub.tags.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400">
+                          Joined {formatTimeAgo(subClub.joined_at || subClub.user_joined_at)}
+                        </span>
+                        
+                        <Link
+                          to={`/sub-clubs/${subClub.id}`}
+                          className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+                        >
+                          View →
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="glass-card rounded-xl p-8 text-center">
+                  <div className="mb-4">
+                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">No sub-clubs yet</h4>
+                  <p className="text-gray-600 mb-4">Create or join sub-clubs to connect with like-minded people!</p>
+                  <div className="flex justify-center space-x-3">
+                    <Link
+                      to="/create-subclub"
+                      className="btn-primary px-6 py-2"
+                    >
+                      Create Independent Sub-Club
+                    </Link>
+                    <Link
+                      to="/communities"
+                      className="btn-secondary px-6 py-2"
+                    >
+                      Browse Communities
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>

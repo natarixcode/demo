@@ -29,9 +29,35 @@ export const AuthProvider = ({ children }) => {
         const storedToken = localStorage.getItem('token');
         
         if (storedUser && storedToken) {
+          // Validate token format (basic JWT format check)
+          const tokenParts = storedToken.split('.');
+          if (tokenParts.length !== 3) {
+            console.warn('Invalid token format detected, clearing auth data');
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+            return;
+          }
+          
+          // Try to parse user data
           const userData = JSON.parse(storedUser);
-          setUser(userData);
-          setIsAuthenticated(true);
+          
+          // Validate token by making a test request
+          const testResponse = await fetch('http://localhost:3001/api/communities', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${storedToken}`
+            }
+          });
+          
+          if (testResponse.ok || testResponse.status === 200) {
+            setUser(userData);
+            setIsAuthenticated(true);
+          } else {
+            console.warn('Token validation failed, clearing auth data');
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+          }
         }
       } catch (err) {
         console.error('Error checking auth:', err);
@@ -50,7 +76,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch('http://localhost:3001/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -93,7 +119,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch('http://localhost:3001/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -133,7 +159,7 @@ export const AuthProvider = ({ children }) => {
   // Check username availability
   const checkUsernameAvailability = async (username) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/auth/check-username/${username}`);
+      const response = await fetch(`http://localhost:3001/api/auth/check-username/${username}`);
       const data = await response.json();
       
       if (response.ok) {
@@ -152,7 +178,7 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
     
     try {
-      const response = await fetch('http://localhost:5000/api/auth/create-demo-users', {
+      const response = await fetch('http://localhost:3001/api/auth/create-demo-users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -215,7 +241,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${user.id}`, {
+      const response = await fetch(`http://localhost:3001/api/users/${user.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -255,6 +281,16 @@ export const AuthProvider = ({ children }) => {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   };
 
+  // Clear all authentication data (useful for debugging)
+  const clearAuth = () => {
+    setUser(null);
+    setIsAuthenticated(false);
+    setError(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    console.log('Authentication data cleared');
+  };
+
   const value = {
     user,
     isAuthenticated,
@@ -268,7 +304,8 @@ export const AuthProvider = ({ children }) => {
     checkUsernameAvailability,
     createDemoUsers,
     loginAsDemoUser,
-    getAuthHeader
+    getAuthHeader,
+    clearAuth
   };
 
   return (
@@ -277,3 +314,6 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 }; 
+
+// Export AuthContext as a named export
+export { AuthContext }; 

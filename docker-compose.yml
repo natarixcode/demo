@@ -26,6 +26,7 @@ services:
       - "3001:3001"
     environment:
       - NODE_ENV=production
+      - PORT=3001
       - DATABASE_URL=postgresql://postgres:admin@db:5432/notorix
       - JWT_SECRET=notorix_super_secure_jwt_secret_production_2024
       - CORS_ORIGINS=http://localhost,https://your-domain.com

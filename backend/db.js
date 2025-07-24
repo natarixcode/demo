@@ -6,7 +6,7 @@ require('dotenv').config({ path: './config.env' });
 const poolConfig = {
   user: 'postgres',
   password: 'admin',
-  host: 'localhost',
+  host: process.env.NODE_ENV === 'production' ? 'db' : 'localhost',
   port: 5432,
   database: 'notorix',
   // Connection pool settings

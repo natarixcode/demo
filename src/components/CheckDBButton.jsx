@@ -36,7 +36,7 @@ const CheckDBButton = () => {
     
     try {
       // Call backend API to test database connection
-      const response = await fetch('http://localhost:5000/api/test-db', {
+      const response = await fetch('http://localhost:3001/api/test-db', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
