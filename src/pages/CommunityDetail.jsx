@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import JoinRequestsPanel from '../components/JoinRequestsPanel';
 
 const CommunityDetail = () => {
   const { id } = useParams();
@@ -577,6 +578,14 @@ const CommunityDetail = () => {
             </div>
           </div>
         </div>
+
+        {/* Join Requests Management (for private community creators/moderators) */}
+        {community.visibility === 'private' && (community.user_role === 'creator' || community.user_role === 'moderator') && (
+          <JoinRequestsPanel
+            communityId={id}
+            currentUser={user}
+          />
+        )}
 
         {/* Members Management (for creators/moderators) */}
         {showMembers && (community.user_role === 'creator' || community.user_role === 'moderator') && (

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Page Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .info { color: #3b82f6; }
+        pre { background: #f3f4f6; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        button { 
+            background: #3b82f6; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin: 5px;
+        }
+        button:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Profile Page Debug Test</h1>
+    
+    <div class="test-section">
+        <h2>📡 Backend API Tests</h2>
+        <button onclick="testHealthEndpoint()">Test Health Endpoint</button>
+        <button onclick="testUserEndpoint()">Test User API</button>
+        <button onclick="testUserPostsEndpoint()">Test User Posts API</button>
+        <div id="api-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🌐 Frontend Profile Page Tests</h2>
+        <p class="info">Current page URL: <span id="current-url"></span></p>
+        <button onclick="testProfilePageAccess()">Test Profile Page Access</button>
+        <button onclick="window.open('http://localhost:5173/user/1', '_blank')">Open Profile Page (User 1)</button>
+        <button onclick="window.open('http://localhost:5173/user/2', '_blank')">Open Profile Page (User 2)</button>
+        <div id="frontend-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Direct API Test Results</h2>
+        <div id="direct-test-results">
+            <p>Click the test buttons above to see results here.</p>
+        </div>
+    </div>
+
+    <script>
+        // Display current URL
+        document.getElementById('current-url').textContent = window.location.href;
+
+        async function testHealthEndpoint() {
+            const resultsDiv = document.getElementById('api-results');
+            resultsDiv.innerHTML = '<p class="info">Testing health endpoint...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/health');
+                const data = await response.json();
+                
+                resultsDiv.innerHTML = `
+                    <h3 class="success">✅ Health Endpoint Working</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <h3 class="error">❌ Health Endpoint Failed</h3>
+                    <p class="error">Error: ${error.message}</p>
+                    <p class="info">Make sure backend is running on port 3001</p>
+                `;
+            }
+        }
+
+        async function testUserEndpoint() {
+            const resultsDiv = document.getElementById('api-results');
+            resultsDiv.innerHTML = '<p class="info">Testing user endpoint...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/users/1');
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    resultsDiv.innerHTML = `
+                        <h3 class="success">✅ User API Working</h3>
+                        <p><strong>Username:</strong> ${data.data.username}</p>
+                        <p><strong>Email:</strong> ${data.data.email}</p>
+                        <p><strong>ID:</strong> ${data.data.id}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <h3 class="error">❌ User API Response Issue</h3>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <h3 class="error">❌ User API Failed</h3>
+                    <p class="error">Error: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function testUserPostsEndpoint() {
+            const resultsDiv = document.getElementById('api-results');
+            resultsDiv.innerHTML = '<p class="info">Testing user posts endpoint...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/users/1/posts');
+                const data = await response.json();
+                
+                resultsDiv.innerHTML = `
+                    <h3 class="success">✅ User Posts API Response</h3>
+                    <p><strong>Posts Count:</strong> ${data.data ? data.data.length : 0}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <h3 class="error">❌ User Posts API Failed</h3>
+                    <p class="error">Error: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function testProfilePageAccess() {
+            const resultsDiv = document.getElementById('frontend-results');
+            resultsDiv.innerHTML = `
+                <h3 class="info">🔗 Profile Page Links</h3>
+                <p>Try these direct links:</p>
+                <ul>
+                    <li><a href="http://localhost:5173/user/1" target="_blank">User 1 Profile</a></li>
+                    <li><a href="http://localhost:5173/user/2" target="_blank">User 2 Profile</a></li>
+                </ul>
+                <p class="info">If these don't work:</p>
+                <ol>
+                    <li>Check that frontend is running on port 5173</li>
+                    <li>Open browser console (F12) and look for errors</li>
+                    <li>Verify the route is defined in App.jsx</li>
+                </ol>
+            `;
+        }
+
+        // Auto-run health check on page load
+        window.onload = function() {
+            testHealthEndpoint();
+        };
+    </script>
+</body>
+</html> 

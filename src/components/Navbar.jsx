@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import SimpleNotificationBell from './SimpleNotificationBell';
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -122,7 +123,7 @@ const Navbar = () => {
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-2">
               <NavLink to="/" icon="🏠">Home</NavLink>
-              <NavLink to="/communities" icon="🏘️">Communities</NavLink>
+              <NavLink to="/nexus" icon="🧭">Community Nexus</NavLink>
               {isAuthenticated && (
                 <NavLink to="/create-post" icon="✍️">Create Post</NavLink>
               )}
@@ -131,25 +132,31 @@ const Navbar = () => {
             {/* Right side */}
             <div className="flex items-center space-x-4">
               {isAuthenticated ? (
-                <div className="relative">
-                  <button
-                    onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                    className="flex items-center space-x-2 p-2 rounded-xl hover:bg-white/40 transition-all duration-200"
-                  >
-                    <div className="w-8 h-8 bg-gradient-to-br from-iosBlue to-iosPurple rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                      {user?.username?.charAt(0).toUpperCase()}
-                    </div>
-                    <svg 
-                      className={`w-4 h-4 text-iosGray-600 transition-transform duration-200 ${isProfileMenuOpen ? 'rotate-180' : ''}`} 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
+                <>
+                                  {/* Professional Notification Bell */}
+                <SimpleNotificationBell />
+                  
+                  {/* Profile Dropdown */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                      className="flex items-center space-x-2 p-2 rounded-xl hover:bg-white/40 transition-all duration-200"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  <ProfileDropdown />
-                </div>
+                      <div className="w-8 h-8 bg-gradient-to-br from-iosBlue to-iosPurple rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                        {user?.username?.charAt(0).toUpperCase()}
+                      </div>
+                      <svg 
+                        className={`w-4 h-4 text-iosGray-600 transition-transform duration-200 ${isProfileMenuOpen ? 'rotate-180' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <ProfileDropdown />
+                  </div>
+                </>
               ) : (
                 <div className="flex items-center space-x-3">
                   <Link
@@ -188,7 +195,7 @@ const Navbar = () => {
           <div className="fixed top-16 left-0 right-0 bg-white/95 backdrop-blur-xl border-b border-white/20 shadow-ios-lg animate-slide-up">
             <div className="px-4 py-6 space-y-2">
               <NavLink to="/" icon="🏠">Home</NavLink>
-              <NavLink to="/communities" icon="🏘️">Communities</NavLink>
+              <NavLink to="/nexus" icon="🧭">Community Nexus</NavLink>
               {isAuthenticated && (
                 <NavLink to="/create-post" icon="✍️">Create Post</NavLink>
               )}

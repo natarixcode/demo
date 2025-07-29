@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
+import JoinButton from './JoinButton';
 
 /**
  * Beautiful iOS 17-inspired Community Card Component
@@ -163,12 +164,24 @@ const CommunityCard = ({ community, userLocation, onJoinStatusChange }) => {
               {community.description || 'A wonderful community to connect and share.'}
             </p>
 
-            {/* Type Badge */}
-            <div className={`inline-flex items-center space-x-2 px-3 py-1 bg-gradient-to-r ${typeInfo.bgColor} border ${typeInfo.borderColor} rounded-full`}>
-              <span className="text-sm">{typeInfo.icon}</span>
-              <span className={`text-xs font-medium ${typeInfo.textColor}`}>
-                {typeInfo.label}
-              </span>
+            {/* Type Badge and Privacy Badge */}
+            <div className="flex items-center space-x-2">
+              <div className={`inline-flex items-center space-x-2 px-3 py-1 bg-gradient-to-r ${typeInfo.bgColor} border ${typeInfo.borderColor} rounded-full`}>
+                <span className="text-sm">{typeInfo.icon}</span>
+                <span className={`text-xs font-medium ${typeInfo.textColor}`}>
+                  {typeInfo.label}
+                </span>
+              </div>
+              
+              {/* Privacy Badge */}
+              {community.visibility === 'private' && (
+                <div className="inline-flex items-center space-x-1 px-2 py-1 bg-gradient-to-r from-slate-100 to-slate-200 border border-slate-300 rounded-full">
+                  <svg className="w-3 h-3 text-slate-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-xs font-medium text-slate-600">Private</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -238,33 +251,16 @@ const CommunityCard = ({ community, userLocation, onJoinStatusChange }) => {
             <span>View</span>
           </Link>
 
-          {/* Join/Leave Button */}
-          <button
-            onClick={handleJoinToggle}
-            disabled={isJoining}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-semibold transition-all duration-200 shadow-ios disabled:opacity-50 disabled:cursor-not-allowed ${
-              isJoined
-                ? 'bg-iosGray-200 text-iosGray-700 hover:bg-iosGray-300'
-                : 'bg-iosBlue text-white hover:bg-iosBlue/90'
-            }`}
-          >
-            {isJoining ? (
-              <>
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                <span>...</span>
-              </>
-            ) : isJoined ? (
-              <>
-                <span>✓</span>
-                <span>Joined</span>
-              </>
-            ) : (
-              <>
-                <span>+</span>
-                <span>Join</span>
-              </>
-            )}
-          </button>
+          {/* Smart Join Button with Privacy Support */}
+          <JoinButton
+            community={community}
+            currentUser={user}
+            onJoinSuccess={() => {
+              setIsJoined(true);
+              setMemberCount(prev => prev + 1);
+              onJoinStatusChange?.();
+            }}
+          />
         </div>
 
         {/* Additional Actions */}

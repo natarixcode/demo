@@ -11,6 +11,8 @@ const { pool } = require('./db');
 // Import routes
 const testDbRoute = require('./routes/test-db.route');
 const communityRoute = require('./routes/community.route');
+const discoveryRoute = require('./routes/discovery.route');
+const nexusRoute = require('./routes/nexus.route');
 
 const app = express();
 
@@ -19,7 +21,7 @@ app.use(cors({
   origin: ['http://localhost', 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:4173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
 }));
 
 app.use(express.json());
@@ -55,8 +57,10 @@ const requireDB = (req, res, next) => {
 // ================================
 
 
-// Mount test-db routes
+// Mount routes (order matters - more specific routes first)
 app.use('/api', testDbRoute);
+app.use('/api/nexus', nexusRoute);
+app.use('/api/communities/discovery', discoveryRoute);
 app.use('/api', communityRoute);
 
 // Basic route with API documentation
@@ -112,19 +116,32 @@ app.get('/api/users', requireDB, async (req, res) => {
   }
 });
 
-// Get user by ID
+// Get user by ID (Enhanced with profile fields)
 app.get('/api/users/:id', requireDB, async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('SELECT id, username, email, created_at FROM users WHERE id = $1', [id]);
+    const result = await pool.query(`
+      SELECT id, username, email, bio, location, avatar_color, karma, 
+             post_count, comment_count, display_name, created_at 
+      FROM users 
+      WHERE id = $1
+    `, [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
     
+    const user = result.rows[0];
+    
+    // Generate avatar initials from username
+    const avatarInitials = user.username.slice(0, 2).toUpperCase();
+    
     res.json({
       message: 'User retrieved successfully',
-      data: result.rows[0]
+      data: {
+        ...user,
+        avatar_initials: avatarInitials
+      }
     });
   } catch (err) {
     console.error('Error fetching user:', err);
@@ -159,27 +176,50 @@ app.post('/api/users', requireDB, async (req, res) => {
   }
 });
 
-// Update user
+// Update user profile (Enhanced with all profile fields)
 app.put('/api/users/:id', requireDB, async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, email } = req.body;
+    const { username, email, bio, location, display_name, avatar_color } = req.body;
     
-    const result = await pool.query(
-      'UPDATE users SET username = COALESCE($1, username), email = COALESCE($2, email) WHERE id = $3 RETURNING id, username, email, created_at',
-      [username, email, id]
-    );
+    // Validate avatar color format if provided
+    if (avatar_color && !/^#[0-9A-F]{6}$/i.test(avatar_color)) {
+      return res.status(400).json({ error: 'Invalid avatar color format. Must be hex color like #3B82F6' });
+    }
+    
+    const result = await pool.query(`
+      UPDATE users 
+      SET username = COALESCE($1, username), 
+          email = COALESCE($2, email),
+          bio = COALESCE($3, bio),
+          location = COALESCE($4, location),
+          display_name = COALESCE($5, display_name),
+          avatar_color = COALESCE($6, avatar_color),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $7 
+      RETURNING id, username, email, bio, location, avatar_color, karma, 
+                post_count, comment_count, display_name, created_at, updated_at
+    `, [username, email, bio, location, display_name, avatar_color, id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
     
+    const user = result.rows[0];
+    const avatarInitials = user.username.slice(0, 2).toUpperCase();
+    
     res.json({
-      message: 'User updated successfully',
-      data: result.rows[0]
+      message: 'User profile updated successfully',
+      data: {
+        ...user,
+        avatar_initials: avatarInitials
+      }
     });
   } catch (err) {
     console.error('Error updating user:', err);
+    if (err.code === '23505') { // Unique constraint violation
+      return res.status(400).json({ error: 'Username or email already exists' });
+    }
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -197,6 +237,688 @@ app.delete('/api/users/:id', requireDB, async (req, res) => {
     res.json({ message: 'User deleted successfully' });
   } catch (err) {
     console.error('Error deleting user:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Refresh user statistics (manually trigger stats update)
+app.post('/api/users/:id/refresh-stats', requireDB, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if user exists
+    const userCheck = await pool.query('SELECT 1 FROM users WHERE id = $1', [id]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Call the update_user_stats function
+    await pool.query('SELECT update_user_stats($1)', [id]);
+    
+    // Get updated user data
+    const result = await pool.query(`
+      SELECT id, username, email, bio, location, avatar_color, karma, 
+             post_count, comment_count, display_name, created_at 
+      FROM users 
+      WHERE id = $1
+    `, [id]);
+    
+    const user = result.rows[0];
+    const avatarInitials = user.username.slice(0, 2).toUpperCase();
+    
+    res.json({
+      message: 'User statistics refreshed successfully',
+      data: {
+        ...user,
+        avatar_initials: avatarInitials
+      }
+    });
+  } catch (err) {
+    console.error('Error refreshing user stats:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Get user leaderboard (top users by karma)
+app.get('/api/users/leaderboard/karma', requireDB, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    
+    const result = await pool.query(`
+      SELECT id, username, display_name, avatar_color, karma, post_count, comment_count
+      FROM users 
+      WHERE karma > 0
+      ORDER BY karma DESC 
+      LIMIT $1
+    `, [limit]);
+    
+    const leaderboard = result.rows.map(user => ({
+      ...user,
+      avatar_initials: user.username.slice(0, 2).toUpperCase()
+    }));
+    
+    res.json({
+      message: 'Karma leaderboard retrieved successfully',
+      data: leaderboard,
+      count: leaderboard.length
+    });
+  } catch (err) {
+    console.error('Error fetching karma leaderboard:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// ================================
+// NOTIFICATION ROUTES
+// ================================
+
+// Get user's notifications with pagination and grouping
+app.get('/api/notifications', requireDB, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.headers['x-user-id']; // Temporary fallback for testing
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+    const unreadOnly = req.query.unread === 'true';
+
+    // Build query conditions
+    let whereClause = 'WHERE n.user_id = $1';
+    let params = [userId];
+    
+    if (unreadOnly) {
+      whereClause += ' AND n.is_read = FALSE';
+    }
+
+    // Get notifications with sender information
+    const notificationsQuery = `
+      SELECT 
+        n.*,
+        s.username as sender_username,
+        s.display_name as sender_display_name,
+        s.avatar_color as sender_avatar_color,
+        CASE 
+          WHEN DATE(n.created_at) = CURRENT_DATE THEN 'Today'
+          WHEN DATE(n.created_at) = CURRENT_DATE - INTERVAL '1 day' THEN 'Yesterday'
+          WHEN n.created_at >= CURRENT_DATE - INTERVAL '7 days' THEN 'This Week'
+          ELSE 'Earlier'
+        END as date_group
+      FROM notifications n
+      LEFT JOIN users s ON n.sender_id = s.id
+      ${whereClause}
+      ORDER BY n.created_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+    
+    params.push(limit, offset);
+    
+    const result = await pool.query(notificationsQuery, params);
+    
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as total,
+             COUNT(CASE WHEN is_read = FALSE THEN 1 END) as unread
+      FROM notifications n
+      ${whereClause.replace(/\$\d+/g, (match, p1) => {
+        const index = parseInt(match.slice(1));
+        return index <= 1 ? match : `$${index - 2}`;
+      })}
+    `;
+    
+    const countResult = await pool.query(countQuery, [userId]);
+    const { total, unread } = countResult.rows[0];
+
+    // Group notifications by date
+    const groupedNotifications = result.rows.reduce((groups, notification) => {
+      const group = notification.date_group;
+      if (!groups[group]) {
+        groups[group] = [];
+      }
+      
+      // Add sender avatar initials
+      if (notification.sender_username) {
+        notification.sender_avatar_initials = notification.sender_username.slice(0, 2).toUpperCase();
+      }
+      
+      groups[group].push(notification);
+      return groups;
+    }, {});
+
+    res.json({
+      message: 'Notifications retrieved successfully',
+      data: groupedNotifications,
+      pagination: {
+        page,
+        limit,
+        total: parseInt(total),
+        unread: parseInt(unread),
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+
+  } catch (err) {
+    console.error('Error fetching notifications:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Get unread notification count
+app.get('/api/notifications/unread-count', requireDB, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.headers['x-user-id']; // Temporary fallback for testing
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const result = await pool.query('SELECT get_unread_count($1) as count', [userId]);
+    const unreadCount = result.rows[0].count;
+
+    res.json({
+      message: 'Unread count retrieved successfully',
+      data: { count: unreadCount }
+    });
+
+  } catch (err) {
+    console.error('Error fetching unread count:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Mark notifications as read
+app.post('/api/notifications/mark-read', requireDB, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.headers['x-user-id']; // Temporary fallback for testing
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { notificationIds } = req.body; // Array of notification IDs, or null for all
+
+    let result;
+    if (notificationIds && Array.isArray(notificationIds)) {
+      // Mark specific notifications as read
+      result = await pool.query(
+        'SELECT mark_notifications_read($1, $2) as affected_rows',
+        [userId, notificationIds]
+      );
+    } else {
+      // Mark all notifications as read
+      result = await pool.query(
+        'SELECT mark_notifications_read($1) as affected_rows',
+        [userId]
+      );
+    }
+
+    const affectedRows = result.rows[0].affected_rows;
+
+    res.json({
+      message: `${affectedRows} notification(s) marked as read`,
+      data: { affectedRows }
+    });
+
+  } catch (err) {
+    console.error('Error marking notifications as read:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Delete notifications
+app.delete('/api/notifications/clear', requireDB, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.headers['x-user-id']; // Temporary fallback for testing
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { notificationIds, olderThan } = req.body;
+
+    let query;
+    let params = [userId];
+
+    if (notificationIds && Array.isArray(notificationIds)) {
+      // Delete specific notifications
+      query = 'DELETE FROM notifications WHERE user_id = $1 AND id = ANY($2) RETURNING id';
+      params.push(notificationIds);
+    } else if (olderThan) {
+      // Delete notifications older than specified date
+      query = 'DELETE FROM notifications WHERE user_id = $1 AND created_at < $2 RETURNING id';
+      params.push(olderThan);
+    } else {
+      // Delete all notifications for user
+      query = 'DELETE FROM notifications WHERE user_id = $1 RETURNING id';
+    }
+
+    const result = await pool.query(query, params);
+    const deletedCount = result.rows.length;
+
+    res.json({
+      message: `${deletedCount} notification(s) deleted successfully`,
+      data: { deletedCount }
+    });
+
+  } catch (err) {
+    console.error('Error deleting notifications:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Get notification preferences
+app.get('/api/notifications/preferences', requireDB, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.headers['x-user-id']; // Temporary fallback for testing
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const result = await pool.query(
+      'SELECT * FROM notification_preferences WHERE user_id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      // Create default preferences if they don't exist
+      const createResult = await pool.query(`
+        INSERT INTO notification_preferences (user_id) 
+        VALUES ($1) 
+        RETURNING *
+      `, [userId]);
+      
+      return res.json({
+        message: 'Default notification preferences created',
+        data: createResult.rows[0]
+      });
+    }
+
+    res.json({
+      message: 'Notification preferences retrieved successfully',
+      data: result.rows[0]
+    });
+
+  } catch (err) {
+    console.error('Error fetching notification preferences:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Update notification preferences
+app.put('/api/notifications/preferences', requireDB, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.headers['x-user-id']; // Temporary fallback for testing
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const {
+      allow_comment,
+      allow_reply,
+      allow_join,
+      allow_like,
+      allow_mention,
+      allow_follow,
+      allow_community_invite,
+      email_notifications,
+      push_notifications
+    } = req.body;
+
+    const result = await pool.query(`
+      UPDATE notification_preferences 
+      SET 
+        allow_comment = COALESCE($2, allow_comment),
+        allow_reply = COALESCE($3, allow_reply),
+        allow_join = COALESCE($4, allow_join),
+        allow_like = COALESCE($5, allow_like),
+        allow_mention = COALESCE($6, allow_mention),
+        allow_follow = COALESCE($7, allow_follow),
+        allow_community_invite = COALESCE($8, allow_community_invite),
+        email_notifications = COALESCE($9, email_notifications),
+        push_notifications = COALESCE($10, push_notifications),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = $1
+      RETURNING *
+    `, [
+      userId, allow_comment, allow_reply, allow_join, allow_like,
+      allow_mention, allow_follow, allow_community_invite,
+      email_notifications, push_notifications
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Notification preferences not found' });
+    }
+
+    res.json({
+      message: 'Notification preferences updated successfully',
+      data: result.rows[0]
+    });
+
+  } catch (err) {
+    console.error('Error updating notification preferences:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Create a new notification (for testing or admin use)
+app.post('/api/notifications', requireDB, async (req, res) => {
+  try {
+    const senderId = req.user?.id || req.headers['x-user-id']; // Temporary fallback for testing
+    
+    const {
+      userId: targetUserId,
+      type,
+      title,
+      content,
+      relatedId,
+      relatedType,
+      actionUrl
+    } = req.body;
+
+    if (!targetUserId || !type || !title || !content) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: userId, type, title, content' 
+      });
+    }
+
+    // Validate notification type
+    const validTypes = ['comment', 'reply', 'join', 'like', 'mention', 'follow', 'community_invite'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({ 
+        error: 'Invalid notification type',
+        validTypes 
+      });
+    }
+
+    const result = await pool.query(
+      'SELECT create_notification($1, $2, $3, $4, $5, $6, $7, $8) as notification_id',
+      [targetUserId, type, title, content, senderId, relatedId, relatedType, actionUrl]
+    );
+
+    const notificationId = result.rows[0].notification_id;
+
+    if (notificationId) {
+      res.status(201).json({
+        message: 'Notification created successfully',
+        data: { id: notificationId }
+      });
+    } else {
+      res.json({
+        message: 'Notification not created (user preferences or self-action)',
+        data: null
+      });
+    }
+
+  } catch (err) {
+    console.error('Error creating notification:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Get notification analytics (admin only)
+app.get('/api/notifications/analytics', requireDB, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.headers['x-user-id'];
+    
+    // Simple admin check (you might want to implement proper role-based access)
+    const userCheck = await pool.query('SELECT username FROM users WHERE id = $1', [userId]);
+    if (!userCheck.rows[0] || userCheck.rows[0].username !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const result = await pool.query(`
+      SELECT * FROM notification_analytics 
+      WHERE notification_date >= CURRENT_DATE - INTERVAL '30 days'
+      ORDER BY notification_date DESC, total_count DESC
+      LIMIT 100
+    `);
+
+    res.json({
+      message: 'Notification analytics retrieved successfully',
+      data: result.rows
+    });
+
+  } catch (err) {
+    console.error('Error fetching notification analytics:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// ================================
+// NOTIFICATION INTEGRATION EXAMPLES
+// ================================
+
+// Example: Post a comment (with notification trigger)
+app.post('/api/posts/:postId/comments', requireDB, async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { content } = req.body;
+    const userId = req.user?.id || req.headers['x-user-id']; // Temporary fallback for testing
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({ error: 'Comment content is required' });
+    }
+
+    // Get post information for notification
+    const postQuery = await pool.query(`
+      SELECT p.*, u.username as author_username, u.display_name as author_display_name
+      FROM posts p 
+      JOIN users u ON p.author = u.id 
+      WHERE p.id = $1
+    `, [postId]);
+
+    if (postQuery.rows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const post = postQuery.rows[0];
+
+    // Get commenter information
+    const commenterQuery = await pool.query(`
+      SELECT username, display_name FROM users WHERE id = $1
+    `, [userId]);
+
+    const commenter = commenterQuery.rows[0];
+    const commenterName = commenter.display_name || commenter.username;
+
+    // Create comment (you'll need to implement the actual comment creation)
+    const result = await pool.query(
+      'INSERT INTO comments (post_id, author, content) VALUES ($1, $2, $3) RETURNING *',
+      [postId, userId, content]
+    );
+
+    // Trigger notification using the service
+    const NotificationService = require('./services/notificationService');
+    
+    try {
+      await NotificationService.notifyPostComment(
+        postId,
+        post.author,
+        userId,
+        commenterName,
+        post.title
+      );
+    } catch (notificationError) {
+      console.error('Error creating comment notification:', notificationError);
+      // Don't fail the comment creation if notification fails
+    }
+
+    res.status(201).json({
+      message: 'Comment created successfully',
+      data: result.rows[0]
+    });
+
+  } catch (err) {
+    console.error('Error creating comment:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Example: Like a post (with notification trigger)
+app.post('/api/posts/:postId/like', requireDB, async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const userId = req.user?.id || req.headers['x-user-id']; // Temporary fallback for testing
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Check if already liked
+    const existingLike = await pool.query(
+      'SELECT id FROM post_votes WHERE user_id = $1 AND post_id = $2 AND vote_type = $3',
+      [userId, postId, 'upvote']
+    );
+
+    if (existingLike.rows.length > 0) {
+      return res.status(400).json({ error: 'Post already liked' });
+    }
+
+    // Get post information
+    const postQuery = await pool.query(`
+      SELECT p.*, u.username as author_username, u.display_name as author_display_name
+      FROM posts p 
+      JOIN users u ON p.author = u.id 
+      WHERE p.id = $1
+    `, [postId]);
+
+    if (postQuery.rows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const post = postQuery.rows[0];
+
+    // Get liker information
+    const likerQuery = await pool.query(`
+      SELECT username, display_name FROM users WHERE id = $1
+    `, [userId]);
+
+    const liker = likerQuery.rows[0];
+    const likerName = liker.display_name || liker.username;
+
+    // Create like (you'll need to implement the actual like creation)
+    await pool.query(
+      'INSERT INTO post_votes (user_id, post_id, vote_type) VALUES ($1, $2, $3)',
+      [userId, postId, 'upvote']
+    );
+
+    // Update post upvote count
+    await pool.query(
+      'UPDATE posts SET upvotes = upvotes + 1 WHERE id = $1',
+      [postId]
+    );
+
+    // Trigger notification using the service
+    const NotificationService = require('./services/notificationService');
+    
+    try {
+      await NotificationService.notifyPostLike(
+        postId,
+        post.author,
+        userId,
+        likerName,
+        post.title
+      );
+    } catch (notificationError) {
+      console.error('Error creating like notification:', notificationError);
+      // Don't fail the like if notification fails
+    }
+
+    res.json({
+      message: 'Post liked successfully'
+    });
+
+  } catch (err) {
+    console.error('Error liking post:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Example: Join a community (with notification trigger)
+app.post('/api/communities/:communityId/join', requireDB, async (req, res) => {
+  try {
+    const { communityId } = req.params;
+    const userId = req.user?.id || req.headers['x-user-id']; // Temporary fallback for testing
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Check if already a member
+    const existingMembership = await pool.query(
+      'SELECT id FROM community_memberships WHERE user_id = $1 AND community_id = $2',
+      [userId, communityId]
+    );
+
+    if (existingMembership.rows.length > 0) {
+      return res.status(400).json({ error: 'Already a member of this community' });
+    }
+
+    // Get community information
+    const communityQuery = await pool.query(`
+      SELECT c.*, u.username as creator_username, u.display_name as creator_display_name
+      FROM communities c 
+      JOIN users u ON c.creator_id = u.id 
+      WHERE c.id = $1
+    `, [communityId]);
+
+    if (communityQuery.rows.length === 0) {
+      return res.status(404).json({ error: 'Community not found' });
+    }
+
+    const community = communityQuery.rows[0];
+
+    // Get joiner information
+    const joinerQuery = await pool.query(`
+      SELECT username, display_name FROM users WHERE id = $1
+    `, [userId]);
+
+    const joiner = joinerQuery.rows[0];
+    const joinerName = joiner.display_name || joiner.username;
+
+    // Create membership (you'll need to implement the actual membership creation)
+    await pool.query(
+      'INSERT INTO community_memberships (user_id, community_id, role, status) VALUES ($1, $2, $3, $4)',
+      [userId, communityId, 'member', 'active']
+    );
+
+    // Update community member count
+    await pool.query(
+      'UPDATE communities SET member_count = member_count + 1 WHERE id = $1',
+      [communityId]
+    );
+
+    // Trigger notification using the service
+    const NotificationService = require('./services/notificationService');
+    
+    try {
+      await NotificationService.notifyCommunityJoin(
+        communityId,
+        community.creator_id,
+        userId,
+        joinerName,
+        community.name
+      );
+    } catch (notificationError) {
+      console.error('Error creating join notification:', notificationError);
+      // Don't fail the join if notification fails
+    }
+
+    res.json({
+      message: 'Joined community successfully'
+    });
+
+  } catch (err) {
+    console.error('Error joining community:', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });

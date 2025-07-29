@@ -22,6 +22,8 @@ const CreateCommunityPost = lazy(() => import("./pages/CreateCommunityPost"));
 const SubClubDetail = lazy(() => import("./pages/SubClubDetail"));
 const CreateSubClubPost = lazy(() => import("./pages/CreateSubClubPost"));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
+const CommunityNexus = lazy(() => import('./pages/CommunityNexus'));
+const NotificationSettings = lazy(() => import('./pages/NotificationSettings'));
 
 /**
  * Protected Route Component
@@ -101,9 +103,11 @@ function App() {
                 <Routes>
                   {/* Public Routes */}
                   <Route path="/" element={<Home />} />
+                  <Route path="/nexus" element={<CommunityNexus />} />
+                  <Route path="/discovery" element={<CommunityNexus />} />
+                  <Route path="/communities" element={<CommunityNexus />} />
                   <Route path="/post/:id" element={<PostDetails />} />
                   <Route path="/community" element={<Community />} />
-                  <Route path="/communities" element={<Communities />} />
                   <Route path="/communities/:id" element={<CommunityDetail />} />
                   <Route path="/user/:userId" element={<UserProfile />} />
                   
@@ -179,6 +183,14 @@ function App() {
                     element={
                       <ProtectedRoute>
                         <CreateSubClubPost />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/settings/notifications" 
+                    element={
+                      <ProtectedRoute>
+                        <NotificationSettings />
                       </ProtectedRoute>
                     } 
                   />

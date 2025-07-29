@@ -2,8 +2,106 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 const API_BASE_URL = 'http://localhost:3001';
 
-// Generic API hook with caching and request cancellation
-export const useApi = (url, options = {}) => {
+// General API utility hook that returns HTTP methods
+export const useApi = () => {
+  const get = useCallback(async (url) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}${url}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('API Error:', error);
+      throw error;
+    }
+  }, []);
+
+  const post = useCallback(async (url, body = {}) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}${url}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('API Error:', error);
+      throw error;
+    }
+  }, []);
+
+  const put = useCallback(async (url, body = {}) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}${url}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('API Error:', error);
+      throw error;
+    }
+  }, []);
+
+  const del = useCallback(async (url) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}${url}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('API Error:', error);
+      throw error;
+    }
+  }, []);
+
+  return { get, post, put, delete: del };
+};
+
+// Generic API hook with caching and request cancellation (for specific URL)
+export const useApiData = (url, options = {}) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -196,7 +294,7 @@ export const useDelete = (url, options = {}) => {
 
 // Posts hook with enhanced features
 export const usePosts = (includeDrafts = false) => {
-  const { data, loading, error, refetch } = useApi(
+  const { data, loading, error, refetch } = useApiData(
     `/api/posts?drafts=${includeDrafts}`,
     { immediate: true }
   );
@@ -212,7 +310,7 @@ export const usePosts = (includeDrafts = false) => {
 
 // Single post hook
 export const useSinglePost = (postId) => {
-  const { data, loading, error, refetch } = useApi(
+  const { data, loading, error, refetch } = useApiData(
     postId ? `/api/posts/${postId}` : null,
     { immediate: !!postId }
   );
@@ -272,7 +370,7 @@ export const useVotePost = (postId) => {
 
 // Get user vote hook
 export const useUserVote = (postId, userId) => {
-  const { data, loading, error, refetch } = useApi(
+  const { data, loading, error, refetch } = useApiData(
     postId && userId ? `/api/posts/${postId}/vote/${userId}` : null,
     { immediate: !!(postId && userId) }
   );
@@ -306,7 +404,7 @@ export const useVoteComment = (commentId) => {
 
 // Comments for post hook
 export const useComments = (postId) => {
-  const { data, loading, error, refetch } = useApi(
+  const { data, loading, error, refetch } = useApiData(
     postId ? `/api/posts/${postId}/comments` : null,
     { immediate: !!postId }
   );
@@ -356,7 +454,7 @@ export const useSharePost = (postId) => {
 
 // Get share statistics hook
 export const useShareStats = (postId) => {
-  const { data, loading, error, refetch } = useApi(
+  const { data, loading, error, refetch } = useApiData(
     postId ? `/api/posts/${postId}/shares` : null,
     { immediate: !!postId }
   );

@@ -2,7 +2,7 @@
 const { Pool } = require('pg');
 require('dotenv').config({ path: './config.env' });
 
-// PostgreSQL connection configuration
+// PostgreSQL connection configuration (auto-detected working config)
 const poolConfig = {
   user: 'postgres',
   password: 'admin',
@@ -10,10 +10,10 @@ const poolConfig = {
   port: 5432,
   database: 'notorix',
   // Connection pool settings
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
-  maxUses: 7500, // Close (and replace) a connection after it has been used 7500 times
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+  maxUses: 7500,
 };
 
 // Create connection pool
@@ -39,16 +39,10 @@ const testConnection = async () => {
   let client;
   
   try {
-    // Get client from pool
     client = await pool.connect();
-    
-    // Simple test query
     const result = await client.query('SELECT NOW() as current_time, version() as postgres_version');
-    
-    // Calculate connection time
     const connectionTime = Date.now() - startTime;
     
-    // Return success result
     return {
       success: true,
       message: 'Database connection successful!',
@@ -79,7 +73,6 @@ const testConnection = async () => {
     };
     
   } finally {
-    // Always release the client back to the pool
     if (client) {
       client.release();
     }
@@ -96,7 +89,6 @@ const closePool = async () => {
   }
 };
 
-// Handle process termination
 process.on('SIGINT', closePool);
 process.on('SIGTERM', closePool);
 
@@ -104,4 +96,4 @@ module.exports = {
   pool,
   testConnection,
   closePool
-}; 
+};
