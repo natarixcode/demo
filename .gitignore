@@ -1,0 +1,41 @@
+node_modules/
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.pnpm-debug.log*
+
+# dotenv
+.env
+.env.*.local
+
+# React
+build/
+dist/
+
+# VSCode settings
+.vscode/
+
+# Mac & Windows
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# GitHub LFS or system artifacts
+*.exe
+*.dll
+*.bin
+
+# Optional: IDE files
+.idea/
+*.iml
+*.suo
+*.ntvs_analysis.dat
+*.njsproj
+*.sln
+*.sw?
